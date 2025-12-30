@@ -617,10 +617,7 @@ class PlaylistDownloader {
             </a>
         `).join('');
 
-        // Track download for monetization
-        if (typeof window.trackDownloadComplete === 'function') {
-            window.trackDownloadComplete(files.length);
-        }
+
 
         // Scroll to completed section
         this.elements.completedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -710,77 +707,4 @@ class PlaylistDownloader {
 let app;
 document.addEventListener('DOMContentLoaded', () => {
     app = new PlaylistDownloader();
-
-    // Initialize Interstitial Ad Manager
-    initInterstitialManager();
 });
-
-// ==========================================
-// INTERSTITIAL AD MANAGER
-// ==========================================
-function initInterstitialManager() {
-    const modal = document.getElementById('interstitialModal');
-    const closeBtn = document.getElementById('closeInterstitial');
-    const timerSpan = document.getElementById('closeTimer');
-
-    if (!modal || !closeBtn || !timerSpan) return;
-
-    let downloadCount = parseInt(localStorage.getItem('playlistdl_download_count') || '0');
-    const SHOW_AD_EVERY = 3; // Mostrar anuncio cada 3 descargas
-    const TIMER_SECONDS = 5;
-
-    // Track downloads and show interstitial
-    window.trackDownloadComplete = function (filesCount) {
-        downloadCount += filesCount;
-        localStorage.setItem('playlistdl_download_count', downloadCount.toString());
-
-        // Show interstitial every X downloads
-        if (downloadCount >= SHOW_AD_EVERY && downloadCount % SHOW_AD_EVERY === 0) {
-            showInterstitial();
-        }
-    };
-
-    function showInterstitial() {
-        modal.classList.remove('hidden');
-        closeBtn.disabled = true;
-
-        let remaining = TIMER_SECONDS;
-        timerSpan.textContent = remaining;
-
-        const interval = setInterval(() => {
-            remaining--;
-            timerSpan.textContent = remaining;
-
-            if (remaining <= 0) {
-                clearInterval(interval);
-                closeBtn.disabled = false;
-                timerSpan.style.display = 'none';
-            }
-        }, 1000);
-    }
-
-    function hideInterstitial() {
-        modal.classList.add('hidden');
-        timerSpan.style.display = 'flex';
-    }
-
-    closeBtn.addEventListener('click', () => {
-        if (!closeBtn.disabled) {
-            hideInterstitial();
-        }
-    });
-
-    // Close on background click (only if timer finished)
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal && !closeBtn.disabled) {
-            hideInterstitial();
-        }
-    });
-
-    // Close on Escape key (only if timer finished)
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden') && !closeBtn.disabled) {
-            hideInterstitial();
-        }
-    });
-}
