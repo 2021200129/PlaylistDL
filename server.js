@@ -55,6 +55,7 @@ app.post('/api/playlist-info', async (req, res) => {
 
         ytdlp.stderr.on('data', (data) => {
             errorOutput += data.toString();
+            console.error(`yt-dlp stderr: ${data}`);
         });
 
         ytdlp.on('close', (code) => {
@@ -537,7 +538,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
 
         ytdlp.stderr.on('data', (data) => {
             // Silenciar errores stderr para no saturar la consola
-            // console.error(`stderr: ${data}`);
+            console.error(`stderr: ${data}`);
         });
 
         ytdlp.on('close', (code) => {
