@@ -46,7 +46,13 @@ class PlaylistDownloader {
 
             // Quality Selector
             mp3Quality: document.getElementById('mp3Quality'),
-            mp4Quality: document.getElementById('mp4Quality')
+            mp4Quality: document.getElementById('mp4Quality'),
+
+            // Failed Section
+            failedSection: document.getElementById('failedSection'),
+            failedMessage: document.getElementById('failedMessage'),
+            failedList: document.getElementById('failedList'),
+            retryFailedBtn: document.getElementById('retryFailedBtn')
         };
 
         // State
@@ -57,7 +63,8 @@ class PlaylistDownloader {
         this.socket = null;
         this.downloading = false;
         this.currentSessionDir = null;
-        this.estimatedSizes = { mp3: 0, mp4: 0 }; // Tamaños estimados totales
+        this.estimatedSizes = { mp3: 0, mp4: 0 };
+        this.failedSongs = []; // Tamaños estimados totales
 
         this.init();
     }
@@ -89,6 +96,7 @@ class PlaylistDownloader {
             console.log('✅ Descarga completada:', data);
             this.currentSessionDir = data.sessionDir;
             this.showCompleted(data.files, data.sessionDir);
+            this.showFailed();
             this.downloading = false;
         });
 
@@ -130,6 +138,17 @@ class PlaylistDownloader {
 
         // New Download Button
         this.elements.newDownload.addEventListener('click', () => this.resetUI());
+
+        // Retry Failed Button
+        if (this.elements.retryFailedBtn) {
+            this.elements.retryFailedBtn.addEventListener('click', () => this.retryFailed());
+        }
+
+        // Export Buttons
+        const exportTxt = document.getElementById('exportTxt');
+        const exportCsv = document.getElementById('exportCsv');
+        if (exportTxt) exportTxt.addEventListener('click', () => this.exportList('txt'));
+        if (exportCsv) exportCsv.addEventListener('click', () => this.exportList('csv'));
 
         // Toggle Advanced Options
         if (this.elements.toggleOptions) {
@@ -508,6 +527,11 @@ class PlaylistDownloader {
                     </svg>
                 `;
                 statusText.textContent = 'Error';
+                // Registrar canción fallida
+                if (!this.failedSongs.find(s => s.id === songId)) {
+                    const failedSong = this.songs.find(s => s.id === songId);
+                    if (failedSong) this.failedSongs.push(failedSong);
+                }
                 break;
         }
 
@@ -628,6 +652,7 @@ class PlaylistDownloader {
         this.songs = [];
         this.selectedSongs.clear();
         this.downloading = false;
+        this.failedSongs = [];
 
         // Reset input
         this.elements.playlistUrl.value = '';
@@ -637,6 +662,7 @@ class PlaylistDownloader {
         this.elements.playlistInfo.classList.add('hidden');
         this.elements.downloadProgress.classList.add('hidden');
         this.elements.completedSection.classList.add('hidden');
+        if (this.elements.failedSection) this.elements.failedSection.classList.add('hidden');
         this.hideError();
 
         // Reset select all
@@ -660,6 +686,131 @@ class PlaylistDownloader {
 
         // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+
+    showFailed() {
+        if (!this.failedSongs.length) {
+            if (this.elements.failedSection) {
+                this.elements.failedSection.classList.add('hidden');
+            }
+            return;
+        }
+
+        this.elements.failedSection.classList.remove('hidden');
+        const count = this.failedSongs.length;
+        this.elements.failedMessage.textContent =
+            count === 1
+                ? 'No se pudo descargar 1 canción'
+                : `No se pudieron descargar ${count} canciones`;
+
+        this.elements.failedList.innerHTML = this.failedSongs.map((song, i) => `
+            <div class="failed-item">
+                <span class="failed-item-number">${i + 1}</span>
+                <span class="failed-item-title" title="${this.escapeHtml(song.title)}">${this.escapeHtml(song.title)}</span>
+                <button class="failed-item-copy" onclick="app.copyTitle(this, '${this.escapeHtml(song.title).replace(/'/g, "\\'")}')">
+                    Copiar título
+                </button>
+            </div>
+        `).join('');
+
+        this.elements.failedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    copyTitle(btn, title) {
+        navigator.clipboard.writeText(title).then(() => {
+            btn.textContent = '¡Copiado!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'Copiar título';
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    retryFailed() {
+        if (!this.failedSongs.length || this.downloading) return;
+
+        const songsToRetry = [...this.failedSongs];
+        this.failedSongs = [];
+
+        // Resetear UI de descarga
+        this.elements.failedSection.classList.add('hidden');
+        this.elements.completedSection.classList.add('hidden');
+        this.elements.downloadProgress.classList.remove('hidden');
+        this.elements.downloadList.innerHTML = '';
+
+        this.elements.downloadList.innerHTML = songsToRetry.map((song) => `
+            <div class="download-item" data-id="${song.id}">
+                <div class="download-item-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <div class="download-item-info">
+                    <p class="download-item-title">${this.escapeHtml(song.title)}</p>
+                    <p class="download-item-status">En espera...</p>
+                </div>
+                <div class="download-item-progress">
+                    <div class="download-item-progress-bar"></div>
+                </div>
+            </div>
+        `).join('');
+
+        this.downloading = true;
+        const filenameTemplate = this.elements.filenameTemplate?.value || '%(title)s';
+        const embedMetadata = this.elements.embedMetadata?.checked ?? true;
+        const quality = this.quality[this.format];
+
+        this.socket.emit('start-download', {
+            songs: songsToRetry,
+            format: this.format,
+            quality: quality,
+            filenameTemplate: filenameTemplate,
+            embedMetadata: embedMetadata
+        });
+    }
+
+    exportList(format) {
+        if (!this.songs.length) return;
+
+        const playlistTitle = this.elements.playlistTitle?.textContent || 'playlist';
+        const sanitizedTitle = playlistTitle.replace(/[^a-z0-9áéíóúñ ]/gi, '').trim() || 'playlist';
+        const selectedOnly = this.selectedSongs.size > 0 && this.selectedSongs.size < this.songs.length;
+        const songsToExport = selectedOnly
+            ? this.songs.filter(s => this.selectedSongs.has(s.id))
+            : this.songs;
+
+        let content, mimeType, extension;
+
+        if (format === 'txt') {
+            content = `${playlistTitle}\n`;
+            content += `Total: ${songsToExport.length} canciones\n`;
+            content += '='.repeat(40) + '\n\n';
+            content += songsToExport.map((s, i) =>
+                `${i + 1}. ${s.title}${s.channel ? ' — ' + s.channel : ''}${s.duration ? ' [' + this.formatDuration(s.duration) + ']' : ''}`
+            ).join('\n');
+            mimeType = 'text/plain;charset=utf-8';
+            extension = 'txt';
+        } else {
+            const escape = val => `"${String(val || '').replace(/"/g, '""')}"`;
+            const header = 'N°,Título,Artista,Duración,URL';
+            const rows = songsToExport.map((s, i) =>
+                [i + 1, escape(s.title), escape(s.channel || ''), escape(this.formatDuration(s.duration)), escape(s.url)].join(',')
+            );
+            content = '\uFEFF' + [header, ...rows].join('\n');
+            mimeType = 'text/csv;charset=utf-8';
+            extension = 'csv';
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sanitizedTitle}.${extension}`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     // Utility Methods
