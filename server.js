@@ -431,6 +431,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
             '--no-playlist',
             '--cookies', COOKIES_FILE,
             '--no-warnings',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             '--newline',
             '--progress',
             '--progress-template', '%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._downloaded_bytes_str)s|%(progress._total_bytes_str)s'
