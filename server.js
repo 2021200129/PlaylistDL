@@ -25,7 +25,7 @@ if (process.env.YOUTUBE_COOKIES) {
     fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
     console.log('✅ Cookies escritas correctamente, tamaño:', process.env.YOUTUBE_COOKIES.length);
 } else {
-    console.log('❌ Variable YOUTUBE_COOKIES no encontrada');
+    console.log('⚠️ Sin cookies, continuando sin autenticación');
 }
 
 // Crear directorio de descargas si no existe
@@ -50,7 +50,7 @@ app.post('/api/playlist-info', async (req, res) => {
         const ytdlp = spawn(YTDLP_CMD, [
             '--flat-playlist',
             '-J',
-            '--cookies', COOKIES_FILE,
+            ...(fs.existsSync(COOKIES_FILE) ? ['--cookies', COOKIES_FILE] : []),
             '--no-warnings',
             url
         ]);
@@ -429,7 +429,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
         const args = [
             '-o', outputTemplate,
             '--no-playlist',
-            '--cookies', COOKIES_FILE,
+            ...(fs.existsSync(COOKIES_FILE) ? ['--cookies', COOKIES_FILE] : []),
             '--no-warnings',
             '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             '--newline',
