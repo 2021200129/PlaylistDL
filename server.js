@@ -23,6 +23,9 @@ const YTDLP_CMD = process.env.YTDLP_PATH || 'yt-dlp';
 const COOKIES_FILE = '/tmp/cookies.txt';
 if (process.env.YOUTUBE_COOKIES) {
     fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
+    console.log('✅ Cookies escritas correctamente, tamaño:', process.env.YOUTUBE_COOKIES.length);
+} else {
+    console.log('❌ Variable YOUTUBE_COOKIES no encontrada');
 }
 
 // Crear directorio de descargas si no existe
