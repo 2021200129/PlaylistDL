@@ -440,6 +440,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
             const audioQuality = qualityMap[quality] || '2';
             args.push('-f', 'bestaudio/best');
             args.push('-x', '--audio-format', 'mp3', '--audio-quality', audioQuality);
+            args.push('--no-check-formats');
 
             // Metadatos automáticos para MP3
             if (options.embedMetadata) {
@@ -450,7 +451,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
                     '--parse-metadata', `title:%(title)s`,
                     '--parse-metadata', `${song.artist || song.channel}:%(artist)s`,
                     '--parse-metadata', `${song.album || 'YouTube'}:%(album)s`,
-                    '--convert-thumbnails', 'jpg'  // Convertir thumbnail a jpg para compatibilidad
+                    //'--convert-thumbnails', 'jpg'  // Convertir thumbnail a jpg para compatibilidad
                 );
             }
         } else if (format === 'mp4') {
