@@ -426,6 +426,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
         const args = [
             '-o', outputTemplate,
             '--no-playlist',
+            '--cookies', COOKIES_FILE,
             '--no-warnings',
             '--newline',
             '--progress',
