@@ -476,6 +476,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
 
         args.push(song.url);
 
+        console.log('Cookies file exists:', fs.existsSync(COOKIES_FILE), '| Args:', args.join(' '));
         const ytdlp = spawn(YTDLP_CMD, args);
         let lastProgress = 0;
 
