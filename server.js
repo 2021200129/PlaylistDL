@@ -426,7 +426,6 @@ function downloadSong(song, outputDir, format, options, onProgress) {
         const args = [
             '-o', outputTemplate,
             '--no-playlist',
-            '--cookies', COOKIES_FILE,
             '--no-warnings',
             '--newline',
             '--progress',
@@ -438,7 +437,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
             // 320k=0, 256k=2, 192k=5, 128k=7
             const qualityMap = { '320': '0', '256': '2', '192': '5', '128': '7' };
             const audioQuality = qualityMap[quality] || '2';
-
+            args.push('-f', 'bestaudio/best');
             args.push('-x', '--audio-format', 'mp3', '--audio-quality', audioQuality);
 
             // Metadatos automáticos para MP3
