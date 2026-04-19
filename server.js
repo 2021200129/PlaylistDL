@@ -20,6 +20,11 @@ const PORT = process.env.PORT || 3000;
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const YTDLP_CMD = process.env.YTDLP_PATH || 'yt-dlp';
 
+const COOKIES_FILE = '/tmp/cookies.txt';
+if (process.env.YOUTUBE_COOKIES) {
+    fs.writeFileSync(COOKIES_FILE, process.env.YOUTUBE_COOKIES);
+}
+
 // Crear directorio de descargas si no existe
 if (!fs.existsSync(DOWNLOADS_DIR)) {
     fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
@@ -42,6 +47,7 @@ app.post('/api/playlist-info', async (req, res) => {
         const ytdlp = spawn(YTDLP_CMD, [
             '--flat-playlist',
             '-J',
+            '--cookies', COOKIES_FILE,
             '--no-warnings',
             url
         ]);
@@ -420,6 +426,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
         const args = [
             '-o', outputTemplate,
             '--no-playlist',
+            '--cookies', COOKIES_FILE,
             '--no-warnings',
             '--newline',
             '--progress',
