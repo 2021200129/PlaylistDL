@@ -647,9 +647,17 @@ app.post('/api/auto-download', async (req, res) => {
         // Mover archivos a Descargas de Android
         const { exec } = require('child_process');
         exec(`find "${sessionDir}" -name "*.mp3" -exec cp {} /sdcard/Download/ \\;`, (err) => {
-            if (!err) console.log('[Auto-Download] Archivos copiados a /sdcard/Download/');
-            else console.error('[Auto-Download] Error copiando:', err.message);
+    if (!err) {
+        console.log('[Auto-Download] Archivos copiados a /sdcard/Download/');
+        // Forzar escaneo de medios en Android
+        exec('termux-media-scan /sdcard/Download/', (err2) => {
+            if (!err2) console.log('[Auto-Download] Escaneo de medios completado ✓');
         });
+    } else {
+        console.error('[Auto-Download] Error copiando:', err.message);
+    }
+});
+        
     } catch (err) {
         console.error('[Auto-Download] Error:', err);
     }
