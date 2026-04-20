@@ -646,8 +646,9 @@ app.post('/api/auto-download', async (req, res) => {
         console.log(`[Auto-Download] Completado: ${succeeded} exitosas, ${failed} fallidas.`);
         // Mover archivos a Descargas de Android
         const { exec } = require('child_process');
-        exec(`cp ${sessionDir}/*.mp3 /sdcard/Download/ 2>/dev/null || true`, (err) => {
+        exec(`find "${sessionDir}" -name "*.mp3" -exec cp {} /sdcard/Download/ \\;`, (err) => {
             if (!err) console.log('[Auto-Download] Archivos copiados a /sdcard/Download/');
+            else console.error('[Auto-Download] Error copiando:', err.message);
         });
     } catch (err) {
         console.error('[Auto-Download] Error:', err);
