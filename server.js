@@ -94,13 +94,22 @@ app.post('/api/playlist-info', async (req, res) => {
                     url: `https://www.youtube.com/watch?v=${entry.id}`,
                     thumbnail: entry.thumbnails ? entry.thumbnails[0]?.url : null,
                     channel: entry.channel || entry.uploader || 'Desconocido',
-                    // Información adicional para metadatos
                     artist: entry.channel || entry.uploader || entry.artist || 'Desconocido',
                     album: playlistData.title || 'YouTube Playlist',
-                    // Estimaciones de tamaño
                     estimatedSizeMp3: estimateFileSize(entry.duration, 'mp3'),
                     estimatedSizeMp4: estimateFileSize(entry.duration, 'mp4')
-                })) : [];
+                })) : [{
+                    id: playlistData.id,
+                    title: playlistData.title || 'Video',
+                    duration: playlistData.duration,
+                    url: `https://www.youtube.com/watch?v=${playlistData.id}`,
+                    thumbnail: playlistData.thumbnails ? playlistData.thumbnails[0]?.url : null,
+                    channel: playlistData.channel || playlistData.uploader || 'Desconocido',
+                    artist: playlistData.channel || playlistData.uploader || 'Desconocido',
+                    album: 'YouTube',
+                    estimatedSizeMp3: estimateFileSize(playlistData.duration, 'mp3'),
+                    estimatedSizeMp4: estimateFileSize(playlistData.duration, 'mp4')
+                }];
 
                 // Calcular totales
                 const totalDuration = songs.reduce((acc, song) => acc + (song.duration || 0), 0);

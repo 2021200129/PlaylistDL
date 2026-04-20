@@ -220,7 +220,9 @@ class PlaylistDownloader {
         const patterns = [
             /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/,
             /^(https?:\/\/)?(www\.)?youtube\.com\/playlist\?list=.+/,
-            /^(https?:\/\/)?(www\.)?youtube\.com\/watch\?v=.+&list=.+/
+            /^(https?:\/\/)?(www\.)?youtube\.com\/watch\?v=.+/,
+            /^(https?:\/\/)?(youtu\.be)\/.+/,
+            /^(https?:\/\/)?(music\.youtube\.com)\/.+/
         ];
         return patterns.some(pattern => pattern.test(url));
     }
