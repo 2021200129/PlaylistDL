@@ -577,6 +577,78 @@ function downloadSong(song, outputDir, format, options, onProgress) {
     });
 }
 
+// ─── ENDPOINT PARA INTEGRACIÓN CON MUSIC SYSTEM ───────────────────────────
+app.post('/api/auto-download', async (req, res) => {
+    const { urls, format = 'mp3', quality = '256', secret } = req.body;
+
+    // Verificación básica de seguridad
+    const MUSIC_SYSTEM_SECRET = process.env.MUSIC_SYSTEM_SECRET || '';
+    if (MUSIC_SYSTEM_SECRET && secret !== MUSIC_SYSTEM_SECRET) {
+        return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+        return res.status(400).json({ error: 'Se requiere un array de URLs' });
+    }
+
+    const sessionId = `auto_${Date.now()}`;
+    const sessionDir = path.join(DOWNLOADS_DIR, sessionId);
+    if (!fs.existsSync(sessionDir)) {
+        fs.mkdirSync(sessionDir, { recursive: true });
+    }
+
+    // Responder inmediatamente — la descarga corre en background
+    res.json({
+        status: 'started',
+        sessionId,
+        total: urls.length,
+        message: `Descargando ${urls.length} canción(es) en background`
+    });
+
+    // Convertir URLs a formato que entiende downloadSong
+    const songs = urls.map(url => {
+        const videoId = url.match(/[?&]v=([^&]+)/)?.[1] || url.split('/').pop();
+        return {
+            id: videoId,
+            url,
+            title: videoId,
+            artist: 'YouTube',
+            album: 'Music System',
+            channel: 'YouTube'
+        };
+    });
+
+    const downloadOptions = {
+        filenameTemplate: '%(title)s',
+        embedMetadata: true,
+        quality
+    };
+
+    console.log(`[Auto-Download] Iniciando descarga de ${songs.length} canción(es)...`);
+
+    // Crear socket falso para capturar progreso en consola
+    const fakeSocket = {
+        emit: (event, data) => {
+            if (event === 'song-progress' && data.status === 'completed') {
+                console.log(`[Auto-Download] ✓ ${data.title}`);
+            } else if (event === 'song-progress' && data.status === 'error') {
+                console.log(`[Auto-Download] ✗ ${data.title}: ${data.error}`);
+            }
+        }
+    };
+
+    try {
+        const results = await downloadWithConcurrency(
+            songs, sessionDir, format, fakeSocket, 3, downloadOptions
+        );
+        const succeeded = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        console.log(`[Auto-Download] Completado: ${succeeded} exitosas, ${failed} fallidas.`);
+    } catch (err) {
+        console.error('[Auto-Download] Error:', err);
+    }
+});
+
 // Limpiar descargas antiguas (más de 1 hora)
 function cleanOldDownloads() {
     const oneHourAgo = Date.now() - (60 * 60 * 1000);
