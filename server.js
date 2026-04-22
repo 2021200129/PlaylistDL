@@ -683,7 +683,7 @@ function cleanOldDownloads() {
 // Limpiar cada 30 minutos
 setInterval(cleanOldDownloads, 30 * 60 * 1000);
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🎵 Servidor corriendo en http://localhost:${PORT}`);
     console.log(`📁 Descargas se guardan en: ${DOWNLOADS_DIR}`);
 });
