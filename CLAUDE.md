@@ -1,6 +1,8 @@
 # PlaylistDL
 
-Descargador de playlists/videos de YouTube a MP3/MP4. Basado en el repo de Angel050521 (MIT); el README sigue siendo el original. Visión general del sistema: `../CLAUDE.md`.
+Descargador de playlists/videos de YouTube a MP3/MP4. Basado en el repo de Angel050521 (MIT); mantener `LICENSE` y el crédito al autor. El README sigue siendo el original. Ya se eliminó un `public/sw.js` de anuncios (`3nbf4.com`); no reintroducir scripts de terceros.
+
+Lo usan otras personas (familia y amigos), así que no debe depender de Music System: `/api/auto-download` es una integración opcional para el organizador personal del autor.
 
 ## Arranque
 - `npm run dev` → `server.js` en el puerto `PORT` (3000 por defecto).
