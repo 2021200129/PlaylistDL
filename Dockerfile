@@ -32,6 +32,7 @@ EXPOSE 3000
 
 # Variable de entorno para el puerto
 ENV PORT=3000
+ENV HOST=0.0.0.0
 
 # Iniciar servidor
 CMD ["node", "server.js"]

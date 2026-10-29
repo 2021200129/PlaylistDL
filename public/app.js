@@ -100,6 +100,11 @@ class PlaylistDownloader {
             this.downloading = false;
         });
 
+        this.socket.on('download-error', (data) => {
+            this.showError(data.error);
+            this.downloading = false;
+        });
+
         this.socket.on('global-stats', (data) => {
             this.updateGlobalStats(data);
         });

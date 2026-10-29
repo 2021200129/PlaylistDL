@@ -4,19 +4,16 @@ const { Server } = require('socket.io');
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const cors = require('cors');
 const archiver = require('archiver');
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+// Sin CORS: solo la propia página (mismo origen) puede usar el socket
+const io = new Server(httpServer);
 
 const PORT = process.env.PORT || 3000;
+// Por defecto solo accesible desde esta PC. Usa HOST=0.0.0.0 para compartir en la red local
+const HOST = process.env.HOST || '127.0.0.1';
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const YTDLP_CMD = process.env.YTDLP_PATH || 'yt-dlp';
 
@@ -33,8 +30,19 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
     fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 }
 
-app.use(cors());
 app.use(express.json());
+
+// Evita que un valor del cliente salga de la carpeta de descargas
+const SESSION_ID_REGEX = /^(session|auto)_\d+$/;
+function isSafeFilename(name) {
+    return typeof name === 'string' && name.length > 0 &&
+        name === path.basename(name) && name !== '.' && name !== '..';
+}
+
+// Una URL que empiece con "-" sería interpretada por yt-dlp como opción
+function isValidUrl(url) {
+    return typeof url === 'string' && /^https?:\/\//i.test(url);
+}
 app.use(express.static('public'));
 app.use('/downloads', express.static(DOWNLOADS_DIR));
 
@@ -45,6 +53,9 @@ app.post('/api/playlist-info', async (req, res) => {
     if (!url) {
         return res.status(400).json({ error: 'URL es requerida' });
     }
+    if (!isValidUrl(url)) {
+        return res.status(400).json({ error: 'URL inválida' });
+    }
 
     try {
         const ytdlp = spawn(YTDLP_CMD, [
@@ -52,6 +63,7 @@ app.post('/api/playlist-info', async (req, res) => {
             '-J',
             ...(fs.existsSync(COOKIES_FILE) ? ['--cookies', COOKIES_FILE] : []),
             '--no-warnings',
+            '--',
             url
         ]);
 
@@ -142,7 +154,10 @@ app.post('/api/playlist-info', async (req, res) => {
 // Endpoint para descargar archivo individual
 app.get('/api/download/:sessionId/:filename', (req, res) => {
     const { sessionId, filename } = req.params;
-    const filePath = path.join(DOWNLOADS_DIR, sessionId, decodeURIComponent(filename));
+    if (!SESSION_ID_REGEX.test(sessionId) || !isSafeFilename(filename)) {
+        return res.status(400).json({ error: 'Ruta inválida' });
+    }
+    const filePath = path.join(DOWNLOADS_DIR, sessionId, filename);
 
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'Archivo no encontrado' });
@@ -160,6 +175,9 @@ app.get('/api/download/:sessionId/:filename', (req, res) => {
 // Endpoint para descargar todos los archivos como ZIP
 app.get('/api/download-zip/:sessionId', (req, res) => {
     const { sessionId } = req.params;
+    if (!SESSION_ID_REGEX.test(sessionId)) {
+        return res.status(400).json({ error: 'Sesión inválida' });
+    }
     const sessionDir = path.join(DOWNLOADS_DIR, sessionId);
 
     if (!fs.existsSync(sessionDir)) {
@@ -375,6 +393,10 @@ io.on('connection', (socket) => {
 
     socket.on('start-download', async (data) => {
         const { songs, format, quality, filenameTemplate, embedMetadata } = data;
+        if (!Array.isArray(songs) || !songs.every(song => song && isValidUrl(song.url))) {
+            socket.emit('download-error', { error: 'Lista de canciones inválida' });
+            return;
+        }
         const sessionId = `session_${Date.now()}`;
         const sessionDir = path.join(DOWNLOADS_DIR, sessionId);
 
@@ -431,7 +453,11 @@ io.on('connection', (socket) => {
 function downloadSong(song, outputDir, format, options, onProgress) {
     return new Promise((resolve, reject) => {
         // Construir plantilla de nombre de archivo
-        const template = options.filenameTemplate || '%(title)s';
+        // La plantilla viene del cliente: sin separadores de carpeta ni "..", para no escribir fuera de outputDir
+        let template = options.filenameTemplate || '%(title)s';
+        if (/[\/\\]|\.\./.test(template)) {
+            template = '%(title)s';
+        }
         const outputTemplate = path.join(outputDir, `${template}.%(ext)s`);
         const quality = options.quality || (format === 'mp3' ? '256' : '720');
 
@@ -484,7 +510,7 @@ function downloadSong(song, outputDir, format, options, onProgress) {
             }
         }
 
-        args.push(song.url);
+        args.push('--', song.url);
 
         console.log('Cookies file exists:', fs.existsSync(COOKIES_FILE), '| Args:', args.join(' '));
         const ytdlp = spawn(YTDLP_CMD, args);
@@ -581,14 +607,20 @@ function downloadSong(song, outputDir, format, options, onProgress) {
 app.post('/api/auto-download', async (req, res) => {
     const { urls, format = 'mp3', quality = '256', secret } = req.body;
 
-    // Verificación básica de seguridad
+    // Sin clave configurada el endpoint queda desactivado
     const MUSIC_SYSTEM_SECRET = process.env.MUSIC_SYSTEM_SECRET || '';
-    if (MUSIC_SYSTEM_SECRET && secret !== MUSIC_SYSTEM_SECRET) {
+    if (!MUSIC_SYSTEM_SECRET) {
+        return res.status(503).json({ error: 'Auto-download desactivado: configura MUSIC_SYSTEM_SECRET' });
+    }
+    if (secret !== MUSIC_SYSTEM_SECRET) {
         return res.status(401).json({ error: 'No autorizado' });
     }
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
         return res.status(400).json({ error: 'Se requiere un array de URLs' });
+    }
+    if (!urls.every(isValidUrl)) {
+        return res.status(400).json({ error: 'Todas las URLs deben empezar con http:// o https://' });
     }
 
     const sessionId = `auto_${Date.now()}`;
@@ -683,7 +715,7 @@ function cleanOldDownloads() {
 // Limpiar cada 30 minutos
 setInterval(cleanOldDownloads, 30 * 60 * 1000);
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🎵 Servidor corriendo en http://localhost:${PORT}`);
+httpServer.listen(PORT, HOST, () => {
+    console.log(`🎵 Servidor corriendo en http://localhost:${PORT} (escuchando en ${HOST})`);
     console.log(`📁 Descargas se guardan en: ${DOWNLOADS_DIR}`);
 });
